@@ -12,12 +12,14 @@ public:
     explicit FaceDetector(QObject *parent = nullptr);
     bool loadModel(const QString &modelPath);
     cv::Mat detectAndDraw(const cv::Mat &bgrImage, bool &detected);
+    std::vector<cv::Rect> getLastFaces() const { return m_lastFaces; }
 
 private:
     cv::CascadeClassifier face_cascade;
     cv::Mat mat_small;
     cv::Mat mat_bgr565;
     float scale_factor;
+    std::vector<cv::Rect> m_lastFaces;
 };
 
 #endif

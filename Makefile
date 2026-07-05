@@ -40,7 +40,7 @@ DISTNAME      = face_detection_gui1.0.0
 DISTDIR = /home/alientek/QT_program/face_detection_gui/.tmp/face_detection_gui1.0.0
 LINK          = arm-poky-linux-gnueabi-g++  -march=armv7ve -mfpu=neon  -mfloat-abi=hard -mcpu=cortex-a7 --sysroot=/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi
 LFLAGS        = -Wl,-O1 -Wl,--hash-style=gnu -Wl,--as-needed --sysroot=/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi -Wl,-O1
-LIBS          = $(SUBLIBS) -L/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib -lopencv_core -lopencv_imgproc -lopencv_objdetect -lrt -ldl /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/libQt5Widgets.so /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/libQt5Gui.so /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/libQt5Core.so /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/libGLESv2.so -lpthread   
+LIBS          = $(SUBLIBS) -L/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib -lopencv_core -lopencv_imgproc -lopencv_objdetect -lopencv_face -lrt -ldl /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/libQt5Widgets.so /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/libQt5Gui.so /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/libQt5Core.so /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/libGLESv2.so -lpthread   
 AR            = arm-poky-linux-gnueabi-ar cqs
 RANLIB        = 
 SED           = sed
@@ -52,13 +52,15 @@ OBJECTS_DIR   = ./
 
 ####### Files
 
-SOURCES       = main.cpp \
+SOURCES       = facedatabase.cpp \
+		main.cpp \
 		mainwindow.cpp \
 		camerathread.cpp \
 		facedetector.cpp moc_mainwindow.cpp \
 		moc_camerathread.cpp \
 		moc_facedetector.cpp
-OBJECTS       = main.o \
+OBJECTS       = facedatabase.o \
+		main.o \
 		mainwindow.o \
 		camerathread.o \
 		facedetector.o \
@@ -238,9 +240,11 @@ DIST          = /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linu
 		/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/mkspecs/features/exceptions.prf \
 		/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/mkspecs/features/yacc.prf \
 		/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/mkspecs/features/lex.prf \
-		face_detection_gui.pro mainwindow.h \
+		face_detection_gui.pro facedatabase.h \
+		mainwindow.h \
 		camerathread.h \
-		facedetector.h main.cpp \
+		facedetector.h facedatabase.cpp \
+		main.cpp \
 		mainwindow.cpp \
 		camerathread.cpp \
 		facedetector.cpp
@@ -619,8 +623,8 @@ distdir: FORCE
 	@test -d $(DISTDIR) || mkdir -p $(DISTDIR)
 	$(COPY_FILE) --parents $(DIST) $(DISTDIR)/
 	$(COPY_FILE) --parents /opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/mkspecs/features/data/dummy.cpp $(DISTDIR)/
-	$(COPY_FILE) --parents mainwindow.h camerathread.h facedetector.h $(DISTDIR)/
-	$(COPY_FILE) --parents main.cpp mainwindow.cpp camerathread.cpp facedetector.cpp $(DISTDIR)/
+	$(COPY_FILE) --parents facedatabase.h mainwindow.h camerathread.h facedetector.h $(DISTDIR)/
+	$(COPY_FILE) --parents facedatabase.cpp main.cpp mainwindow.cpp camerathread.cpp facedetector.cpp $(DISTDIR)/
 
 
 clean: compiler_clean 
@@ -656,12 +660,14 @@ compiler_moc_header_make_all: moc_mainwindow.cpp moc_camerathread.cpp moc_facede
 compiler_moc_header_clean:
 	-$(DEL_FILE) moc_mainwindow.cpp moc_camerathread.cpp moc_facedetector.cpp
 moc_mainwindow.cpp: mainwindow.h \
+		facedatabase.h \
 		moc_predefs.h \
 		/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/x86_64-pokysdk-linux/usr/bin/moc
 	/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/x86_64-pokysdk-linux/usr/bin/moc $(DEFINES) --include /home/alientek/QT_program/face_detection_gui/moc_predefs.h -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/mkspecs/linux-oe-g++ -I/home/alientek/QT_program/face_detection_gui -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/QtWidgets -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/QtGui -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/QtCore -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/c++/5.3.0 -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/c++/5.3.0/arm-poky-linux-gnueabi -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/c++/5.3.0/backward -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/x86_64-pokysdk-linux/usr/lib/arm-poky-linux-gnueabi/gcc/arm-poky-linux-gnueabi/5.3.0/include -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/x86_64-pokysdk-linux/usr/lib/arm-poky-linux-gnueabi/gcc/arm-poky-linux-gnueabi/5.3.0/include-fixed -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include mainwindow.h -o moc_mainwindow.cpp
 
 moc_camerathread.cpp: camerathread.h \
 		facedetector.h \
+		facedatabase.h \
 		moc_predefs.h \
 		/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/x86_64-pokysdk-linux/usr/bin/moc
 	/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/x86_64-pokysdk-linux/usr/bin/moc $(DEFINES) --include /home/alientek/QT_program/face_detection_gui/moc_predefs.h -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/lib/mkspecs/linux-oe-g++ -I/home/alientek/QT_program/face_detection_gui -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/QtWidgets -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/QtGui -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/QtCore -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/c++/5.3.0 -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/c++/5.3.0/arm-poky-linux-gnueabi -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include/c++/5.3.0/backward -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/x86_64-pokysdk-linux/usr/lib/arm-poky-linux-gnueabi/gcc/arm-poky-linux-gnueabi/5.3.0/include -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/x86_64-pokysdk-linux/usr/lib/arm-poky-linux-gnueabi/gcc/arm-poky-linux-gnueabi/5.3.0/include-fixed -I/opt/fsl-imx-x11/4.1.15-2.1.0/sysroots/cortexa7hf-neon-poky-linux-gnueabi/usr/include camerathread.h -o moc_camerathread.cpp
@@ -687,16 +693,22 @@ compiler_clean: compiler_moc_predefs_clean compiler_moc_header_clean
 
 ####### Compile
 
-main.o: main.cpp mainwindow.h
+facedatabase.o: facedatabase.cpp facedatabase.h
+	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o facedatabase.o facedatabase.cpp
+
+main.o: main.cpp mainwindow.h \
+		facedatabase.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o main.o main.cpp
 
 mainwindow.o: mainwindow.cpp mainwindow.h \
+		facedatabase.h \
 		camerathread.h \
 		facedetector.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o mainwindow.o mainwindow.cpp
 
 camerathread.o: camerathread.cpp camerathread.h \
-		facedetector.h
+		facedetector.h \
+		facedatabase.h
 	$(CXX) -c $(CXXFLAGS) $(INCPATH) -o camerathread.o camerathread.cpp
 
 facedetector.o: facedetector.cpp facedetector.h

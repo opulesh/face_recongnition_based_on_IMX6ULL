@@ -7,6 +7,10 @@
 #include <QImage>
 #include <QMutex>
 #include <opencv2/opencv.hpp>
+#include <QPushButton>
+#include <QInputDialog>
+#include "facedatabase.h"
+#include <vector>
 
 class CameraThread;
 class FaceDetector;
@@ -37,6 +41,20 @@ private:
     bool framePending;
 
     QImage cvMatToQImage(const cv::Mat &mat);
+
+    QWidget *controlBar;
+    QPushButton *btnRegister;
+    QPushButton *btnMode;       // 切换识别/注册模式
+    QLabel *labelResult;
+    QLabel *labelMode;
+
+    FaceDatabase *faceDB;       // 人脸数据库
+    bool isRegisterMode;        // 当前模式
+    int registerCounter;        // 注册采集计数
+    std::vector<cv::Mat> registerFaces;
+    QString registerName;
+
+    int m_autoRegisterCounter;
 };
 
 #endif

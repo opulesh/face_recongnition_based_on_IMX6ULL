@@ -8,8 +8,12 @@
 #include <cstdio>
 
 CameraThread::CameraThread(QObject *parent)
-    : QThread(parent), v4l2_fd(-1), cam_width(800), cam_height(480), running(false), detector(nullptr)
+    : QThread(parent), v4l2_fd(-1), cam_width(800), cam_height(480), running(false), m_detector(nullptr)
 {
+    m_recognizeMode = true;
+    m_faceDB = nullptr;
+    m_registerRequest = false;
+    m_registerCounter = 0;
 }
 
 CameraThread::~CameraThread()
@@ -129,14 +133,60 @@ void CameraThread::run()
                            cam_width * 2, cam_height);
 
             cv::cvtColor(mat_rgb565, mat_bgr, cv::COLOR_BGR5652BGR);
-
+            bool face_detected = false;
             cv::Mat displayMat;
-            if (detector) {
-                bool face_detected = false;
+            if (m_detector) {
                 // 这里直接调用 detectAndDraw，它内部已经做了缩放，返回带框图像
-                displayMat = detector->detectAndDraw(mat_bgr, face_detected);
+                displayMat = m_detector->detectAndDraw(mat_bgr, face_detected);
             } else {
                 displayMat = mat_bgr;
+            }
+
+//            printf("[DEBUG] face_detected=%d, m_detector=%p, faces=%d\n",
+//                   face_detected,
+//                   (void*)m_detector,
+//                   m_detector ? (int)m_detector->getLastFaces().size() : -1);
+//            fflush(stdout);
+
+            // 如果检测到人脸，处理注册或识别
+            if (face_detected && m_detector) {
+                std::vector<cv::Rect> faces = m_detector->getLastFaces();
+                if (!faces.empty()) {
+                    printf("[REG] start collecting, count=%d\n", m_registerCounter);
+                    fflush(stdout);
+                    cv::Rect faceRect = faces[0];  // 取最大的人脸
+                    cv::Mat faceROI = mat_bgr(faceRect);
+                    cv::Mat gray;
+                    cv::cvtColor(faceROI, gray, cv::COLOR_BGR2GRAY);
+                    cv::resize(gray, gray, cv::Size(100, 100));
+
+                    if (m_recognizeMode) {
+                        // 识别模式
+                        if (m_faceDB) {
+                            double confidence;
+                            QString name = m_faceDB->recognize(gray, confidence);
+                            emit recognized(name, confidence);
+                        }
+                    } else {
+                        // 注册模式
+                        if (m_registerRequest) {
+
+                            m_registerFaces.push_back(gray.clone());
+                            m_registerCounter++;
+                            emit registerProgress(m_registerCounter);
+                            if (m_registerCounter >= 10) {
+                                if (m_faceDB) {
+                                    m_faceDB->registerNewUser(m_registerFaces, m_registerName);
+                                    emit registerFinished(true, m_registerName);
+                                }
+                                m_registerRequest = false;
+                                m_registerFaces.clear();
+                                m_registerCounter = 0;
+                                emit registerFinished(true, m_registerName);
+                            }
+                        }
+                    }
+                }
             }
 
             QImage qimg = cvMatToQImage(displayMat);

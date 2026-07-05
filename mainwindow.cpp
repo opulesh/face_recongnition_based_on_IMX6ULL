@@ -2,6 +2,7 @@
 #include "camerathread.h"
 #include "facedetector.h"
 #include <QVBoxLayout>
+#include <QGridLayout>
 #include <QTimer>
 #include <cstdio>
 
@@ -9,37 +10,70 @@ MainWindow::MainWindow(QWidget *parent)
     : QWidget(parent)
     , isRunning(false)
     , framePending(false)
+    , m_autoRegisterCounter(1)
 {
     printf("[DEBUG] MainWindow start\n");
     fflush(stdout);
 
     setWindowTitle("Face Detection");
 
-    // 直接全屏，无边框
-    showFullScreen();
-
-    // 全屏布局：只有一个 QLabel 充满整个窗口
-    QVBoxLayout *layout = new QVBoxLayout(this);
+    // ======================== 界面布局 (叠加方式) ========================
+    QGridLayout *layout = new QGridLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(0);
 
+    // 视频标签 (填满整个窗口)
     videoLabel = new QLabel(this);
     videoLabel->setStyleSheet("background-color: black;");
     videoLabel->setAlignment(Qt::AlignCenter);
-    layout->addWidget(videoLabel);
+    videoLabel->setAttribute(Qt::WA_TransparentForMouseEvents, true); // 允许事件穿透
+    layout->addWidget(videoLabel, 0, 0);
 
-    // 摄像头和检测器
+    // 控制条 (半透明，悬浮在顶部)
+    controlBar = new QWidget(this);
+    controlBar->setStyleSheet("background-color: rgba(255, 255, 255, 50);");
+    controlBar->setFixedHeight(50);
+    QHBoxLayout *ctlLayout = new QHBoxLayout(controlBar);
+    ctlLayout->setContentsMargins(10, 5, 10, 5);
+
+    btnMode = new QPushButton("Recognition", controlBar);
+    btnMode->setFixedSize(120, 30);
+    btnMode->setStyleSheet("color: white; background-color: #555; border: 1px solid #888; border-radius: 5px;");
+    btnRegister = new QPushButton("Register", controlBar);
+    btnRegister->setFixedSize(120, 30);
+    btnRegister->setStyleSheet("color: white; background-color: #555; border: 1px solid #888; border-radius: 5px;");
+
+    labelMode = new QLabel("Mode: Recognition", controlBar);
+    labelMode->setStyleSheet("color: white;");
+    labelResult = new QLabel("", controlBar);
+    labelResult->setStyleSheet("color: yellow; font-size: 18px;");
+
+    ctlLayout->addWidget(btnMode);
+    ctlLayout->addWidget(btnRegister);
+    ctlLayout->addWidget(labelMode);
+    ctlLayout->addStretch();
+    ctlLayout->addWidget(labelResult);
+
+    layout->addWidget(controlBar, 0, 0, Qt::AlignTop | Qt::AlignLeft);
+
+    // ======================== 功能模块 ========================
     camera = new CameraThread(this);
     detector = new FaceDetector(this);
     camera->setDetector(detector);
 
-    // 刷新定时器（30fps）
+    faceDB = new FaceDatabase();
+    faceDB->loadModel("/opt/face_model.yml");
+    camera->setFaceDatabase(faceDB);   // 传入 faceDB
+
+    isRegisterMode = false;
+    registerCounter = 0;
+
+    // ======================== 定时器 ========================
     refreshTimer = new QTimer(this);
-    refreshTimer->setInterval(33);
+    refreshTimer->setInterval(33); // 30fps
     connect(refreshTimer, &QTimer::timeout, this, &MainWindow::refreshDisplay);
     refreshTimer->start();
 
-    // 摄像头信号
+    // ======================== 信号连接 ========================
     connect(camera, &CameraThread::newFrameAvailable,
             this, &MainWindow::onNewFrame);
     connect(camera, &CameraThread::cameraError,
@@ -47,14 +81,70 @@ MainWindow::MainWindow(QWidget *parent)
                 printf("[ERROR] %s\n", err.toLocal8Bit().constData());
                 fflush(stdout);
             });
+    connect(camera, &CameraThread::recognized, this, [this](const QString &name, double /*conf*/) {
+        labelResult->setText(name);
+    });
+    connect(camera, &CameraThread::registerFinished, this, [this](bool ok, const QString &name) {
+        printf("registerFinished triggered\n");
+        if (ok)
+            labelResult->setText("Registered: " + name);
+        else
+            labelResult->setText("Registration failed");
+        // 注册完毕，自动切回识别模式
+        isRegisterMode = false;
+        btnMode->setText("Recognition");
+        labelMode->setText("Mode: Recognition");
+        camera->setRecognizeMode(true);
+    });
 
-    // 加载人脸模型
+    // ======================== 按钮动作 ========================
+    connect(btnMode, &QPushButton::clicked, [this]() {
+        if (!isRegisterMode) {
+            // 自动生成用户名
+            registerName = QString("user%1").arg(m_autoRegisterCounter++);
+            registerCounter = 0;
+            registerFaces.clear();
+            isRegisterMode = true;
+            btnMode->setText("Recognition");
+            labelMode->setText("Mode: Register");
+            labelResult->setText("Registering: " + registerName);
+
+            camera->setRecognizeMode(false);
+            camera->triggerRegister(registerName);
+        } else {
+            // 切回识别模式
+            isRegisterMode = false;
+            btnMode->setText("Recognition");
+            labelMode->setText("Mode: Recognition");
+            labelResult->setText("");
+            camera->setRecognizeMode(true);
+        }
+    });
+
+    connect(btnRegister, &QPushButton::clicked, [this]() {
+        if (!isRegisterMode) return;
+
+        // 重新开始注册，用新名字
+        registerName = QString("user%1").arg(m_autoRegisterCounter++);
+        registerCounter = 0;
+        registerFaces.clear();
+        labelResult->setText("Registering: " + registerName);
+        camera->triggerRegister(registerName);
+    });
+
+    connect(camera, &CameraThread::registerProgress, this, [this](int count) {
+        printf("[GUI] registerProgress: %d\n", count);
+        fflush(stdout);
+        labelResult->setText(QString("Registering: %1 (%2/10)")
+                             .arg(registerName).arg(count));
+    });
+
+    // ======================== 启动 ========================
     if (!detector->loadModel("/usr/haarcascade_frontalface_default.xml"))
         printf("[WARN] Face model not loaded\n");
 
-    // 自动启动摄像头
+    showFullScreen();
     QTimer::singleShot(100, this, &MainWindow::startCamera);
-
     printf("[DEBUG] MainWindow end\n");
     fflush(stdout);
 }
