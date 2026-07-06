@@ -55,6 +55,9 @@ private:
     QString registerName;
 
     int m_autoRegisterCounter;
+
+    void switchToRegisterMode();
+    void switchToRecognizeMode();
 };
 
 #endif

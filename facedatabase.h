@@ -34,11 +34,14 @@ public:
     // 识别：输入一张人脸灰度图，返回姓名和置信度(越低越好)
     QString recognize(const cv::Mat &faceImage, double &confidence);
 
+    bool isTrained() const { return m_trained; }
+
 private:
     cv::Ptr<cv::face::LBPHFaceRecognizer> m_recognizer;
     QMap<int, QString> m_id2name;   // ID -> 名字
     int m_nextId = 1;
     std::string m_modelPath;        // 模型文件路径
+    bool m_trained = false;         //检测模型是否已经训练
 
     void loadLabelMap(const std::string &labelPath);
     void saveLabelMap(const std::string &labelPath);

@@ -14,33 +14,54 @@ FaceDatabase::FaceDatabase()
 bool FaceDatabase::loadModel(const std::string &modelPath)
 {
     m_modelPath = modelPath;
+    m_trained = false;
 
-    cv::FileStorage fs(modelPath, cv::FileStorage::READ);
-    if (!fs.isOpened())
+    QFile file(QString::fromStdString(modelPath));
+    if (!file.exists()) {
+        printf("[WARN] Model file not found\n");
         return false;
+    }
+    if (file.size() < 100) {
+        printf("[WARN] Model file too small, ignoring\n");
+        return false;
+    }
 
-    m_recognizer->read(fs.root());
-    fs.release();
-
-    // 加载标签映射
-    std::string labelPath = modelPath + ".labels";
-    loadLabelMap(labelPath);
-    return true;
+    try {
+        m_recognizer->load(modelPath);
+        std::string labelPath = modelPath + ".labels";
+        loadLabelMap(labelPath);
+        m_trained = !m_id2name.isEmpty();
+        printf("[DEBUG] loadModel success, trained=%d\n", m_trained);
+        return m_trained;
+    } catch (cv::Exception &e) {
+        printf("[ERROR] loadModel exception: %s\n", e.what());
+        return false;
+    }
 }
 
 bool FaceDatabase::saveModel(const std::string &modelPath)
 {
-    cv::FileStorage fs(modelPath, cv::FileStorage::WRITE);
-    if (!fs.isOpened())
+    try {
+        // 尝试使用 save 方法（OpenCV 3.1 contrib 通常支持）
+        m_recognizer->save(modelPath);
+
+        // 检查文件大小是否正常（至少应大于 100 字节）
+        QFile file(QString::fromStdString(modelPath));
+        qint64 size = file.size();
+        printf("[DEBUG] saveModel: file size = %lld bytes\n", size);
+        if (size < 100) {
+            printf("[ERROR] saveModel: file too small, save failed\n");
+            return false;
+        }
+
+        // 保存标签映射
+        std::string labelPath = modelPath + ".labels";
+        saveLabelMap(labelPath);
+        return true;
+    } catch (cv::Exception &e) {
+        printf("[ERROR] saveModel exception: %s\n", e.what());
         return false;
-
-    m_recognizer->write(fs);
-    fs.release();
-
-    // 保存标签映射
-    std::string labelPath = modelPath + ".labels";
-    saveLabelMap(labelPath);
-    return true;
+    }
 }
 
 int FaceDatabase::registerNewUser(const std::vector<cv::Mat> &faceImages, const QString &name)
@@ -58,8 +79,13 @@ int FaceDatabase::registerNewUser(const std::vector<cv::Mat> &faceImages, const 
     } else {
         m_recognizer->update(faceImages, labels);
     }
-
-    saveModel(m_modelPath);
+    m_trained = true;
+    bool ok = saveModel(m_modelPath);
+    printf("[DEBUG] registerNewUser: saveModel returned %d\n", ok);
+    if (!ok) {
+        printf("[ERROR] Failed to save model, registration may be lost\n");
+    }
+    printf("[INFO] Registered user %s with id %d\n", name.toLocal8Bit().constData(), id);
     return id;
 }
 

@@ -63,6 +63,22 @@ MainWindow::MainWindow(QWidget *parent)
     faceDB = new FaceDatabase();
     faceDB->loadModel("/opt/face_model.yml");
     camera->setFaceDatabase(faceDB);   // 传入 faceDB
+    if (faceDB->isTrained()) {
+        // 模型已训练，默认识别模式
+        camera->setRecognizeMode(true);
+        isRegisterMode = false;
+        btnMode->setText("Register New");
+        labelMode->setText("Mode: Recognition");
+    } else {
+        // 模型未训练，自动进入注册模式
+        camera->setRecognizeMode(false);
+        isRegisterMode = true;
+        registerName = QString("user%1").arg(m_autoRegisterCounter++);
+        camera->triggerRegister(registerName);
+        btnMode->setText("Back to Recognize");
+        labelMode->setText("Mode: Register");
+        labelResult->setText("Registering: " + registerName);
+    }
 
     isRegisterMode = false;
     registerCounter = 0;
@@ -100,36 +116,18 @@ MainWindow::MainWindow(QWidget *parent)
     // ======================== 按钮动作 ========================
     connect(btnMode, &QPushButton::clicked, [this]() {
         if (!isRegisterMode) {
-            // 自动生成用户名
-            registerName = QString("user%1").arg(m_autoRegisterCounter++);
-            registerCounter = 0;
-            registerFaces.clear();
-            isRegisterMode = true;
-            btnMode->setText("Recognition");
-            labelMode->setText("Mode: Register");
-            labelResult->setText("Registering: " + registerName);
-
-            camera->setRecognizeMode(false);
-            camera->triggerRegister(registerName);
+            switchToRegisterMode();
         } else {
-            // 切回识别模式
-            isRegisterMode = false;
-            btnMode->setText("Recognition");
-            labelMode->setText("Mode: Recognition");
-            labelResult->setText("");
-            camera->setRecognizeMode(true);
+            switchToRecognizeMode();
         }
     });
 
     connect(btnRegister, &QPushButton::clicked, [this]() {
         if (!isRegisterMode) return;
-
-        // 重新开始注册，用新名字
-        registerName = QString("user%1").arg(m_autoRegisterCounter++);
         registerCounter = 0;
         registerFaces.clear();
-        labelResult->setText("Registering: " + registerName);
         camera->triggerRegister(registerName);
+        labelResult->setText("Registering: " + registerName + " (retake)");
     });
 
     connect(camera, &CameraThread::registerProgress, this, [this](int count) {
@@ -147,6 +145,28 @@ MainWindow::MainWindow(QWidget *parent)
     QTimer::singleShot(100, this, &MainWindow::startCamera);
     printf("[DEBUG] MainWindow end\n");
     fflush(stdout);
+}
+
+void MainWindow::switchToRegisterMode()
+{
+    registerName = QString("user%1").arg(m_autoRegisterCounter++);
+    registerCounter = 0;
+    registerFaces.clear();
+    isRegisterMode = true;
+    btnMode->setText("Back to Recognize");
+    labelMode->setText("Mode: Register");
+    labelResult->setText("Registering: " + registerName);
+    camera->setRecognizeMode(false);
+    camera->triggerRegister(registerName);
+}
+
+void MainWindow::switchToRecognizeMode()
+{
+    isRegisterMode = false;
+    btnMode->setText("Register New");
+    labelMode->setText("Mode: Recognition");
+    labelResult->setText("");
+    camera->setRecognizeMode(true);
 }
 
 MainWindow::~MainWindow()
